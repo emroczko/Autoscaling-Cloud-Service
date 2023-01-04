@@ -76,14 +76,45 @@ def autoscaling():
 
         sleep(10)
 
+
 def remove_machine_from_pool(vm_num: int):
+    if vm_num <= 0:
+        return
+
     vm_num = str(vm_num) if vm_num > 9 else f'0{vm_num}'
+
+    with open('haproxy.cfg', 'r') as haproxy:
+        haproxy_lines = haproxy.readlines()
+
+    haproxy_lines = [line for line in haproxy_lines if f'192.168.50.1{vm_num}:9103' not in line]
+
+    with open('haproxy.cfg', 'w') as haproxy:
+        haproxy.writelines(haproxy_lines)
+
+    sleep(2)  # we should let all the requests finish in the to-be-killed VM
+
     subprocess.call(["vagrant", "destroy", "-f", f'web{vm_num}'])
 
+    with open('Vagrantfile', 'r') as vagrant:
+        vagrant_lines = vagrant.readlines()
 
+    beginning_line = f'  config.vm.define "web{vm_num}" do |web|\n'
+    if beginning_line in vagrant_lines:
+        print("Deleting entry from Vagrant file")
+        beginning_index = vagrant_lines.index(beginning_line)
+        end_index = beginning_index + 5
+        with open('Vagrantfile', 'w') as vagrant:
+            if vagrant_lines[beginning_index - 1] == '\n':
+                vagrant.writelines(vagrant_lines[:beginning_index - 1])
+            else:
+                vagrant.writelines(vagrant_lines[:beginning_index])
+            vagrant.writelines(vagrant_lines[end_index:])
 
 
 def add_machine_to_pool(vm_num: int):
+    if vm_num <= 0:
+        return
+
     vm_num = str(vm_num) if vm_num > 9 else f'0{vm_num}'
     vm_declaration = """
   config.vm.define "web{0}" do |web|
@@ -93,12 +124,12 @@ def add_machine_to_pool(vm_num: int):
   end
     """.format(vm_num, vm_num, vm_num)
 
-    with open('Vagrantfile', 'r') as vagrant_file:
-        vagrant_lines = vagrant_file.readlines()
+    with open('Vagrantfile', 'r') as vagrant:
+        vagrant_lines = vagrant.readlines()
 
     vagrant_lines.insert(-1, vm_declaration)
-    with open('Vagrantfile', 'w') as vagrant_file:
-        vagrant_file.writelines(vagrant_lines)
+    with open('Vagrantfile', 'w') as vagrant:
+        vagrant.writelines(vagrant_lines)
 
     print(f'Creating vm web{vm_num} again...')
     subprocess.call(["vagrant", "up", f"web{vm_num}"])
@@ -120,7 +151,7 @@ def add_machine_to_pool(vm_num: int):
 
 
 if __name__ == "__main__":
-    add_machine_to_pool(5)
+    remove_machine_from_pool(2)
 
 
         
