@@ -12,7 +12,7 @@ http {
     include       mime.types;
 
     server {
-        listen       80;
+        listen       9103;
         server_name  localhost;
 
         location / {
